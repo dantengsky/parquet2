@@ -30,6 +30,9 @@ pub fn compress(
     input_buf: &[u8],
     output_buf: &mut Vec<u8>,
 ) -> Result<()> {
+    if input_buf.is_empty() {
+        return Ok(())
+    }
     match compression {
         #[cfg(feature = "brotli")]
         CompressionOptions::Brotli(level) => {
@@ -132,6 +135,9 @@ pub fn compress(
 /// Decompresses data stored in slice `input_buf` and writes output to `output_buf`.
 /// Returns the total number of bytes written.
 pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [u8]) -> Result<()> {
+    if input_buf.is_empty() {
+        return Ok(())
+    }
     match compression {
         #[cfg(feature = "brotli")]
         Compression::Brotli => {
@@ -221,7 +227,11 @@ mod tests {
         compress(c, data, &mut compressed).expect("Error when compressing");
 
         // data is compressed...
-        assert!(compressed.len() - offset < data.len());
+        if data.is_empty() {
+            assert_eq!(0, compressed.len() - offset);
+        } else {
+            assert!(compressed.len() - offset < data.len());
+        }
 
         let mut decompressed = vec![0; data.len()];
         decompress(c.into(), &compressed[offset..], &mut decompressed)
@@ -230,7 +240,7 @@ mod tests {
     }
 
     fn test_codec(c: CompressionOptions) {
-        let sizes = vec![1000, 10000, 100000];
+        let sizes = vec![0, 1000, 10000, 100000];
         for size in sizes {
             let data = (0..size).map(|x| (x % 255) as u8).collect::<Vec<_>>();
             test_roundtrip(c, &data);
