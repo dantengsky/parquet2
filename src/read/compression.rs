@@ -1,12 +1,15 @@
 use parquet_format_async_temp::DataPageHeaderV2;
 use streaming_decompression;
 
-use crate::compression::{self, Compression};
-use crate::error::{Error, Result};
-use crate::page::{CompressedDataPage, DataPage, DataPageHeader};
-use crate::FallibleStreamingIterator;
-
 use super::page::PageIterator;
+use crate::compression::Compression;
+use crate::compression::{self};
+use crate::error::Error;
+use crate::error::Result;
+use crate::page::CompressedDataPage;
+use crate::page::DataPage;
+use crate::page::DataPageHeader;
+use crate::FallibleStreamingIterator;
 
 fn decompress_v1(compressed: &[u8], compression: Compression, buffer: &mut [u8]) -> Result<()> {
     compression::decompress(compression, compressed, buffer)
@@ -52,14 +55,25 @@ pub fn decompress_buffer(
         // prepare the compression buffer
         let read_size = compressed_page.uncompressed_size();
         if read_size > buffer.capacity() {
+            // eprintln!(
+            //     "dealloc and ignore, read_size {}, buffer cap {}",
+            //     read_size,
+            //     buffer.capacity()
+            // );
             // dealloc and ignore region, replacing it by a new region.
             // This won't reallocate - it frees and calls `alloc_zeroed`
-            *buffer = vec![0; read_size];
+            //*buffer = vec![0; read_size];
+            *buffer = Vec::with_capacity(read_size);
+            unsafe {
+                buffer.set_len(read_size);
+            };
         } else if read_size > buffer.len() {
+            // eprintln!("resize");
             // fill what we need with zeros so that we can use them in `Read`.
             // This won't reallocate
             buffer.resize(read_size, 0);
         } else {
+            // eprintln!("truncate");
             buffer.truncate(read_size);
         }
         match compressed_page.header() {
@@ -239,8 +253,7 @@ pub struct BasicDecompressor<I: Iterator<Item = Result<CompressedDataPage>>> {
 }
 
 impl<I> BasicDecompressor<I>
-where
-    I: Iterator<Item = Result<CompressedDataPage>>,
+where I: Iterator<Item = Result<CompressedDataPage>>
 {
     /// Returns a new [`BasicDecompressor`].
     pub fn new(iter: I, buffer: Vec<u8>) -> Self {
@@ -256,8 +269,7 @@ where
 }
 
 impl<I> FallibleStreamingIterator for BasicDecompressor<I>
-where
-    I: Iterator<Item = Result<CompressedDataPage>>,
+where I: Iterator<Item = Result<CompressedDataPage>>
 {
     type Item = DataPage;
     type Error = Error;

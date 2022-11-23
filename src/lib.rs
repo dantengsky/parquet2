@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+// #![forbid(unsafe_code)]
 /// Unofficial implementation of parquet IO in Rust.
 
 #[macro_use]
@@ -19,7 +19,6 @@ pub mod types;
 pub mod write;
 
 use parquet_format_async_temp as thrift_format;
-
 pub use streaming_decompression::fallible_streaming_iterator;
 pub use streaming_decompression::FallibleStreamingIterator;
 

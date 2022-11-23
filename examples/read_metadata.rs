@@ -45,7 +45,7 @@ fn main() -> Result<()> {
     let mut reader = std::fs::File::open(path)?;
     let metadata = read_metadata(&mut reader)?;
 
-    println!("{:#?}", metadata);
+    //println!("{:#?}", metadata);
     // ANCHOR_END: metadata
 
     // ANCHOR: column_metadata
@@ -61,12 +61,22 @@ fn main() -> Result<()> {
     let index = read::read_columns_indexes(&mut reader, columns)?;
     // these are the minimum and maximum within each page, which can be used
     // to skip pages.
-    println!("{index:?}");
+    //println!("{index:?}");
 
     // read the offset indexes containing page locations of every column
     let pages = read::read_pages_locations(&mut reader, columns)?;
-    println!("{pages:?}");
+    //println!(">>>>>> pages {pages:#?}");
     // ANCHOR_END: column_index
+
+    //println!("# of columns {} # pages {}", columns.len(), pages.len());
+    //println!(
+    //    " columnss  {:#?}",
+    //    pages
+    //        .iter()
+    //        .zip(columns)
+    //        .map(|(i, c)| (i.len(), &c.descriptor().path_in_schema))
+    //        .collect::<Vec<_>>()
+    //);
 
     // ANCHOR: statistics
     if let Some(maybe_stats) = column_metadata.statistics() {
@@ -123,13 +133,43 @@ fn main() -> Result<()> {
 
     // ANCHOR: decompress
     let mut decompress_buffer = vec![];
+    let mut c = 0;
     for maybe_page in pages {
         let page = maybe_page?;
         let page = parquet2::read::decompress(page, &mut decompress_buffer)?;
+        c += 1;
 
-        let _array = deserialize(&page);
+        //let _array = deserialize(&page);
     }
+    println!("pages number {}", c);
     // ANCHOR_END: decompress
 
+    let mut decompress_buffer = vec![];
+    for col in columns {
+        let pages = get_page_iterator(col, &mut reader, None, vec![])?;
+        // ANCHOR_END: pages
+        //
+
+        // ANCHOR: decompress
+        let mut c = 0;
+        for maybe_page in pages {
+            let page = maybe_page?;
+            let page = parquet2::read::decompress(page, &mut decompress_buffer)?;
+            c += 1;
+
+            //eprintln!("buffer cap {}", decompress_buffer.capacity());
+            decompress_buffer.truncate(0);
+            //let _array = deserialize(&page);
+        }
+        eprintln!(
+            "column {:?}: num_of_pages {}, num_of_rows {}, size {}, size(uncompressed) {}",
+            col.metadata().path_in_schema,
+            c,
+            col.metadata().num_values,
+            col.metadata().total_compressed_size,
+            col.metadata().total_uncompressed_size,
+        );
+    }
+    eprintln!("# of row groups {}", metadata.row_groups.len());
     Ok(())
 }
